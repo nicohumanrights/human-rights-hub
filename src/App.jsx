@@ -112,7 +112,8 @@ export default function HumanRightsHub() {
   const [activeTab, setActiveTab] = useState("home");
   const [selectedRight, setSelectedRight] = useState(null);
   const [selectedTopic, setSelectedTopic] = useState(null);
-
+const [activeAction, setActiveAction] = useState(null);
+const [briefText, setBriefText] = useState("");
   // Auth state
   const [user, setUser] = useState(null);
   const [authMode, setAuthMode] = useState("login"); // "login" | "register"
@@ -669,8 +670,7 @@ export default function HumanRightsHub() {
   );
 
   const renderActions = () => {
-  const [activeAction, setActiveAction] = useState(null);
-  const [briefText, setBriefText] = useState("");
+
 
   const briefVorlage = `Sehr geehrte Damen und Herren,
 
