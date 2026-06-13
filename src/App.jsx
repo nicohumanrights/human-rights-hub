@@ -266,8 +266,7 @@ const [briefText, setBriefText] = useState("");
     if (authMode === "register") {
       const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword });
       if (error) setAuthError(error.message);
-      else { setShowAuth(false); setAuthEmail(""); setAuthPassword(""); }
-    } else {
+else { setAuthError("Bitte bestätige deine E-Mail-Adresse. Wir haben dir eine E-Mail geschickt!"); }    } else {
       const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
       if (error) setAuthError("Falsche E-Mail oder Passwort.");
       else { setShowAuth(false); setAuthEmail(""); setAuthPassword(""); }
@@ -419,7 +418,13 @@ const [briefText, setBriefText] = useState("");
     <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && setShowAuth(false)}>
       <div style={S.modal}>
         <div style={S.modalTitle}>{authMode === "login" ? "Anmelden" : "Registrieren"}</div>
-        {authError && <div style={S.authError}>{authError}</div>}
+        {authError && (
+  <div style={authError.includes("bestätige") 
+    ? {...S.authError, background: "rgba(107,174,117,0.15)", border: "1px solid rgba(107,174,117,0.3)", color: "#6BAE75"} 
+    : S.authError}>
+    {authError}
+  </div>
+)}
         <input style={S.authInput} type="email" placeholder="E-Mail" value={authEmail}
           onChange={e => setAuthEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && handleAuth()} />
         <input style={S.authInput} type="password" placeholder="Passwort" value={authPassword}
