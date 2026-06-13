@@ -668,35 +668,159 @@ export default function HumanRightsHub() {
     </div>
   );
 
-  const renderActions = () => (
+  const renderActions = () => {
+  const [activeAction, setActiveAction] = useState(null);
+  const [briefText, setBriefText] = useState("");
+
+  const briefVorlage = `Sehr geehrte Damen und Herren,
+
+ich schreibe Ihnen als engagierter Bürger, dem die Einhaltung der Menschenrechte sehr am Herzen liegt.
+
+[Beschreiben Sie hier Ihr konkretes Anliegen]
+
+Die Allgemeine Erklärung der Menschenrechte der Vereinten Nationen garantiert jedem Menschen das Recht auf [relevantes Recht einfügen]. Ich bitte Sie daher dringend:
+
+1. [Konkrete Forderung 1]
+2. [Konkrete Forderung 2]
+3. [Konkrete Forderung 3]
+
+Ich erwarte Ihre Stellungnahme und verbleibe mit freundlichen Grüßen,
+
+[Ihr Name]
+[Datum]`;
+
+  if (activeAction === "petition") {
+    return (
+      <div>
+        <button style={S.chatBack} onClick={() => setActiveAction(null)}>← Zurück</button>
+        <h2 style={{ fontSize: "22px", fontWeight: "800", margin: "16px 0 8px" }}>✍️ Petition unterzeichnen</h2>
+        <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)", marginBottom: "20px" }}>Aktuelle Menschenrechtspetitionen auf Change.org</p>
+        {[
+          { title: "Pressefreiheit weltweit schützen", signatures: "124.502", url: "https://www.change.org/search?q=pressefreiheit" },
+          { title: "Kinderarbeit global beenden", signatures: "89.231", url: "https://www.change.org/search?q=kinderarbeit" },
+          { title: "Klimagerechtigkeit für alle", signatures: "201.445", url: "https://www.change.org/search?q=klimagerechtigkeit" },
+          { title: "Flüchtlingsschutz stärken", signatures: "67.890", url: "https://www.change.org/search?q=flüchtlingsschutz" },
+        ].map(p => (
+          <div key={p.title} style={{ padding: "16px 18px", borderRadius: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(200,150,62,0.2)", marginBottom: "10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "4px" }}>{p.title}</div>
+              <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)" }}>✍️ {p.signatures} Unterschriften</div>
+            </div>
+            <a href={p.url} target="_blank" rel="noreferrer" style={{ padding: "8px 16px", borderRadius: "8px", background: "#C8963E", color: "#0D1B2A", fontWeight: "700", fontSize: "13px", textDecoration: "none" }}>
+              Unterschreiben →
+            </a>
+          </div>
+        ))}
+        <a href="https://www.change.org/search?q=menschenrechte" target="_blank" rel="noreferrer" style={{ display: "block", textAlign: "center", marginTop: "16px", color: "#C8963E", fontSize: "13px" }}>
+          Alle Petitionen auf Change.org →
+        </a>
+      </div>
+    );
+  }
+
+  if (activeAction === "brief") {
+    return (
+      <div>
+        <button style={S.chatBack} onClick={() => setActiveAction(null)}>← Zurück</button>
+        <h2 style={{ fontSize: "22px", fontWeight: "800", margin: "16px 0 8px" }}>📧 Brief schreiben</h2>
+        <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)", marginBottom: "20px" }}>Vorlage für einen Brief an Politiker oder Entscheidungsträger</p>
+        <textarea
+          style={{ width: "100%", minHeight: "320px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(200,150,62,0.3)", borderRadius: "12px", padding: "16px", color: "#E8E8E8", fontSize: "13px", lineHeight: "1.7", outline: "none", resize: "vertical", boxSizing: "border-box" }}
+          value={briefText || briefVorlage}
+          onChange={e => setBriefText(e.target.value)}
+        />
+        <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
+          <button onClick={() => { navigator.clipboard.writeText(briefText || briefVorlage); }}
+            style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "1px solid rgba(200,150,62,0.3)", background: "rgba(200,150,62,0.1)", color: "#C8963E", fontWeight: "700", cursor: "pointer", fontSize: "13px" }}>
+            📋 Kopieren
+          </button>
+          <a href={`mailto:?subject=Menschenrechte schützen&body=${encodeURIComponent(briefText || briefVorlage)}`}
+            style={{ flex: 1, padding: "12px", borderRadius: "8px", border: "none", background: "#C8963E", color: "#0D1B2A", fontWeight: "700", cursor: "pointer", fontSize: "13px", textDecoration: "none", textAlign: "center" }}>
+            📧 Per E-Mail senden
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  if (activeAction === "awareness") {
+    return (
+      <div>
+        <button style={S.chatBack} onClick={() => setActiveAction(null)}>← Zurück</button>
+        <h2 style={{ fontSize: "22px", fontWeight: "800", margin: "16px 0 8px" }}>📣 Awareness teilen</h2>
+        <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)", marginBottom: "20px" }}>So kannst du Menschenrechte in sozialen Medien sichtbar machen</p>
+        {[
+          { platform: "Instagram", icon: "📸", tip: "Teile Infografiken zu Menschenrechten in deiner Story. Nutze Hashtags wie #HumanRights #Menschenrechte #StandUp" },
+          { platform: "Twitter / X", icon: "🐦", tip: "Tweete täglich einen Menschenrechtsartikel. Tagging von NGOs wie @amnesty oder @hrw erhöht die Reichweite." },
+          { platform: "TikTok", icon: "🎵", tip: "Kurze Videos über Menschenrechtsverletzungen erreichen Millionen. Erkläre in 60 Sekunden einen Artikel der UN-Charta." },
+          { platform: "WhatsApp", icon: "💬", tip: "Teile diesen Link mit Freunden und Familie: " + window.location.href },
+        ].map(item => (
+          <div key={item.platform} style={{ padding: "16px 18px", borderRadius: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", marginBottom: "10px" }}>
+            <div style={{ fontSize: "15px", fontWeight: "700", marginBottom: "6px" }}>{item.icon} {item.platform}</div>
+            <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.55)", lineHeight: "1.6" }}>{item.tip}</div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (activeAction === "orgs") {
+    return (
+      <div>
+        <button style={S.chatBack} onClick={() => setActiveAction(null)}>← Zurück</button>
+        <h2 style={{ fontSize: "22px", fontWeight: "800", margin: "16px 0 8px" }}>🤝 Organisationen unterstützen</h2>
+        <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)", marginBottom: "20px" }}>Diese Organisationen kämpfen täglich für Menschenrechte</p>
+        {[
+          { name: "Amnesty International", desc: "Weltweit führende Menschenrechtsorganisation – setzt sich für politische Gefangene ein", url: "https://www.amnesty.de", color: "#C8963E" },
+          { name: "Human Rights Watch", desc: "Dokumentiert Menschenrechtsverletzungen und übt Druck auf Regierungen aus", url: "https://www.hrw.org/de", color: "#4A90D9" },
+          { name: "UNHCR", desc: "UN-Flüchtlingshilfswerk – schützt Flüchtlinge und Vertriebene weltweit", url: "https://www.unhcr.org/de", color: "#6BAE75" },
+          { name: "Reporter ohne Grenzen", desc: "Kämpft für Pressefreiheit und schützt Journalisten weltweit", url: "https://www.reporter-ohne-grenzen.de", color: "#9B6DB5" },
+          { name: "UNICEF Deutschland", desc: "Schützt Kinderrechte und sorgt für Bildung, Gesundheit und Schutz", url: "https://www.unicef.de", color: "#E05C5C" },
+        ].map(org => (
+          <div key={org.name} style={{ padding: "16px 18px", borderRadius: "12px", background: "rgba(255,255,255,0.03)", border: `1px solid ${org.color}25`, marginBottom: "10px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+            <div>
+              <div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "4px", color: org.color }}>{org.name}</div>
+              <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.45)", lineHeight: "1.5" }}>{org.desc}</div>
+            </div>
+            <a href={org.url} target="_blank" rel="noreferrer" style={{ padding: "8px 14px", borderRadius: "8px", background: `${org.color}20`, color: org.color, fontWeight: "700", fontSize: "12px", textDecoration: "none", whiteSpace: "nowrap", border: `1px solid ${org.color}30` }}>
+              Besuchen →
+            </a>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
     <div>
       <div style={{ marginBottom: "20px" }}>
         <h2 style={{ fontSize: "22px", fontWeight: "800", marginBottom: "6px" }}>Für Rechte kämpfen</h2>
         <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)" }}>Jede Stimme zählt. Wähle, wie du aktiv werden möchtest.</p>
       </div>
       <div style={S.actionGrid}>
-        {ACTIONS.map(action => (
-          <div key={action.title} style={{ ...S.actionCard(action.color), padding: "24px" }}
+        {[
+          { key: "petition", icon: "✍️", title: "Petition unterzeichnen", desc: "Aktuelle Petitionen für Menschenrechte weltweit", count: "Zu Change.org", color: "#C8963E" },
+          { key: "brief", icon: "📧", title: "Brief schreiben", desc: "Schreibe Politikern & Entscheidungsträgern", count: "Vorlage verfügbar", color: "#4A90D9" },
+          { key: "awareness", icon: "📣", title: "Awareness teilen", desc: "Anleitung für soziale Medien", count: "4 Plattformen", color: "#6BAE75" },
+          { key: "orgs", icon: "🤝", title: "Organisationen unterstützen", desc: "Amnesty International, Human Rights Watch & mehr", count: "5 Partner", color: "#9B6DB5" },
+        ].map(action => (
+          <div key={action.key} style={{ ...S.actionCard(action.color), padding: "24px", cursor: "pointer" }}
+            onClick={() => setActiveAction(action.key)}
             onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.background = `${action.color}08`; }}
             onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}>
             <div style={{ fontSize: "32px", marginBottom: "12px" }}>{action.icon}</div>
             <div style={{ fontSize: "16px", fontWeight: "700", marginBottom: "6px" }}>{action.title}</div>
             <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)", lineHeight: "1.5", marginBottom: "12px" }}>{action.desc}</div>
             <div style={{ fontSize: "12px", fontWeight: "700", color: action.color }}>{action.count}</div>
-            <div style={{ marginTop: "14px", padding: "10px", background: `${action.color}15`, borderRadius: "8px", border: `1px solid ${action.color}25`, textAlign: "center", fontSize: "13px", fontWeight: "700", color: action.color, cursor: "pointer" }}>
+            <div style={{ marginTop: "14px", padding: "10px", background: `${action.color}15`, borderRadius: "8px", border: `1px solid ${action.color}25`, textAlign: "center", fontSize: "13px", fontWeight: "700", color: action.color }}>
               Jetzt →
             </div>
           </div>
         ))}
       </div>
-      <div style={{ marginTop: "28px", padding: "20px", background: "rgba(200,150,62,0.06)", border: "1px solid rgba(200,150,62,0.2)", borderRadius: "12px" }}>
-        <div style={{ fontSize: "13px", fontWeight: "700", color: "#C8963E", marginBottom: "8px" }}>💡 Wusstest du?</div>
-        <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.6)", lineHeight: "1.6" }}>
-          Amnesty International hat seit 1961 Tausende politische Gefangene durch weltweite Briefkampagnen freigebracht. Deine Stimme hat Macht.
-        </div>
-      </div>
     </div>
   );
+};
 
   const tabs = [
     { id: "home", label: "🏠 Home" },
