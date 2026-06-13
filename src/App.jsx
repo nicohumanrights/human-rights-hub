@@ -113,6 +113,7 @@ export default function HumanRightsHub() {
   const [selectedRight, setSelectedRight] = useState(null);
   const [selectedTopic, setSelectedTopic] = useState(null);
 const [activeAction, setActiveAction] = useState(null);
+const [emailConfirmed, setEmailConfirmed] = useState(false);
 const [briefText, setBriefText] = useState("");
   // Auth state
   const [user, setUser] = useState(null);
@@ -148,6 +149,11 @@ const [briefText, setBriefText] = useState("");
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
+      const hash = window.location.hash;
+if (hash.includes("access_token") && hash.includes("type=signup")) {
+  setEmailConfirmed(true);
+  setTimeout(() => setEmailConfirmed(false), 5000);
+}
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
@@ -846,7 +852,11 @@ Ich erwarte Ihre Stellungnahme und verbleibe mit freundlichen Grüßen,
       `}</style>
 
       {showAuth && renderAuthModal()}
-
+{emailConfirmed && (
+  <div style={{ position: "fixed", top: "20px", left: "50%", transform: "translateX(-50%)", background: "rgba(107,174,117,0.95)", border: "1px solid #6BAE75", borderRadius: "12px", padding: "16px 24px", zIndex: 300, fontSize: "15px", fontWeight: "700", color: "#fff", boxShadow: "0 8px 32px rgba(0,0,0,0.3)" }}>
+    ✅ E-Mail erfolgreich bestätigt! Willkommen beim Human Rights Hub.
+  </div>
+)}
       <div style={S.header}>
         <div style={S.logo}>
           <span style={{ fontSize: "28px" }}>🌍</span>
