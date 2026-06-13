@@ -213,12 +213,11 @@ const [briefText, setBriefText] = useState("");
   };
 
   const incrementTopicViews = async (topicId) => {
-    await supabase.rpc("increment_views", { topic_id_input: topicId }).catch(() => {
-      // Fallback: direct update
-      supabase
-        .from("topic_views")
-        .upsert({ topic_id: topicId, views: (topicViews[topicId] || 0) + 1 });
-    });
+    try {
+  await supabase.from("topic_views").upsert({ topic_id: topicId, views: (topicViews[topicId] || 0) + 1 });
+} catch (e) {
+  console.log("views error", e);
+}
     setTopicViews(prev => ({ ...prev, [topicId]: (prev[topicId] || 0) + 1 }));
   };
 
