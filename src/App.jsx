@@ -1,5 +1,78 @@
 import { useState, useRef, useEffect } from "react";
+import { createClient } from "@supabase/supabase-js";
 
+// ─── Supabase Client ────────────────────────────────────────────────────────
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
+
+/*
+  SUPABASE SCHEMA (run in SQL editor):
+
+  -- Nutzer-Profile (wird automatisch nach Auth erstellt)
+  create table public.profiles (
+    id uuid references auth.users on delete cascade primary key,
+    username text unique not null,
+    created_at timestamptz default now()
+  );
+  create or replace function public.handle_new_user()
+  returns trigger as $$
+  begin
+    insert into public.profiles (id, username)
+    values (new.id, split_part(new.email, '@', 1));
+    return new;
+  end;
+  $$ language plpgsql security definer;
+  create trigger on_auth_user_created
+    after insert on auth.users
+    for each row execute procedure public.handle_new_user();
+
+  -- Forum-Beiträge
+  create table public.posts (
+    id uuid default gen_random_uuid() primary key,
+    topic_id integer not null,
+    user_id uuid references public.profiles(id) on delete cascade not null,
+    username text not null,
+    content text not null,
+    likes integer default 0,
+    created_at timestamptz default now()
+  );
+
+  -- Likes (verhindert doppeltes Liken)
+  create table public.likes (
+    id uuid default gen_random_uuid() primary key,
+    post_id uuid references public.posts(id) on delete cascade not null,
+    user_id uuid references public.profiles(id) on delete cascade not null,
+    unique(post_id, user_id)
+  );
+
+  -- Forum-Aufrufe
+  create table public.topic_views (
+    topic_id integer primary key,
+    views integer default 0
+  );
+
+  -- RLS Policies
+  alter table public.profiles enable row level security;
+  alter table public.posts enable row level security;
+  alter table public.likes enable row level security;
+  alter table public.topic_views enable row level security;
+
+  create policy "Profiles sind öffentlich lesbar" on public.profiles for select using (true);
+  create policy "Posts sind öffentlich lesbar" on public.posts for select using (true);
+  create policy "Authentifizierte Nutzer können posten" on public.posts for insert with check (auth.uid() = user_id);
+  create policy "Likes sind öffentlich lesbar" on public.likes for select using (true);
+  create policy "Authentifizierte Nutzer können liken" on public.likes for insert with check (auth.uid() = user_id);
+  create policy "Authentifizierte Nutzer können unliken" on public.likes for delete using (auth.uid() = user_id);
+  create policy "Topic views sind öffentlich" on public.topic_views for all using (true);
+
+  -- Initiale View-Einträge für alle Topics
+  insert into public.topic_views (topic_id, views) values (1,0),(2,0),(3,0),(4,0),(5,0)
+  on conflict do nothing;
+*/
+
+// ─── Static Data ────────────────────────────────────────────────────────────
 const RIGHTS = [
   { id: 1, article: "Art. 1", title: "Würde & Gleichheit", icon: "⚖️", desc: "Alle Menschen sind frei und gleich an Würde und Rechten geboren. Sie sind mit Vernunft und Gewissen begabt und sollen einander im Geist der Brüderlichkeit begegnen.", color: "#C8963E" },
   { id: 2, article: "Art. 3", title: "Recht auf Leben", icon: "🕊️", desc: "Jeder hat das Recht auf Leben, Freiheit und Sicherheit der Person.", color: "#4A90D9" },
@@ -12,11 +85,11 @@ const RIGHTS = [
 ];
 
 const FORUM_TOPICS = [
-  { id: 1, title: "Pressefreiheit in autoritären Staaten", category: "Meinungsfreiheit", posts: 34, hot: true, author: "Leila M.", time: "vor 2 Std." },
-  { id: 2, title: "Kinderrechte: Was können wir konkret tun?", category: "Bildung & Schutz", posts: 21, hot: false, author: "Tobias R.", time: "vor 5 Std." },
-  { id: 3, title: "Klimawandel als Menschenrechtsproblem", category: "Neue Herausforderungen", posts: 58, hot: true, author: "Amina K.", time: "vor 1 Std." },
-  { id: 4, title: "Digitale Überwachung und Privatsphäre", category: "Privatsphäre", posts: 17, hot: false, author: "Sven B.", time: "vor 1 Tag" },
-  { id: 5, title: "Flüchtlingsrechte an den EU-Außengrenzen", category: "Asyl & Migration", posts: 89, hot: true, author: "Fatou D.", time: "vor 3 Std." },
+  { id: 1, title: "Pressefreiheit in autoritären Staaten", category: "Meinungsfreiheit", hot: true },
+  { id: 2, title: "Kinderrechte: Was können wir konkret tun?", category: "Bildung & Schutz", hot: false },
+  { id: 3, title: "Klimawandel als Menschenrechtsproblem", category: "Neue Herausforderungen", hot: true },
+  { id: 4, title: "Digitale Überwachung und Privatsphäre", category: "Privatsphäre", hot: false },
+  { id: 5, title: "Flüchtlingsrechte an den EU-Außengrenzen", category: "Asyl & Migration", hot: true },
 ];
 
 const ACTIONS = [
@@ -34,18 +107,57 @@ const CATEGORY_COLORS = {
   "Asyl & Migration": "#E05C5C",
 };
 
+// ─── Main Component ──────────────────────────────────────────────────────────
 export default function HumanRightsHub() {
   const [activeTab, setActiveTab] = useState("home");
   const [selectedRight, setSelectedRight] = useState(null);
   const [selectedTopic, setSelectedTopic] = useState(null);
+
+  // Auth state
+  const [user, setUser] = useState(null);
+  const [authMode, setAuthMode] = useState("login"); // "login" | "register"
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
+
+  // Forum state
+  const [posts, setPosts] = useState([]);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [newPostText, setNewPostText] = useState("");
+  const [postLoading, setPostLoading] = useState(false);
+  const [topicViews, setTopicViews] = useState({});
+  const [likedPosts, setLikedPosts] = useState(new Set());
+  const [topicPostCounts, setTopicPostCounts] = useState({});
+
+  // AI Chat state
   const [messages, setMessages] = useState([]);
   const [inputMsg, setInputMsg] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+
   const messagesEndRef = useRef(null);
   const chatEndRef = useRef(null);
+  const postsEndRef = useRef(null);
+
+  // ─── Auth Effects ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Load post counts + views for all topics on mount
+  useEffect(() => {
+    loadTopicStats();
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -55,17 +167,128 @@ export default function HumanRightsHub() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
+  useEffect(() => {
+    postsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [posts]);
+
+  // ─── Supabase Functions ────────────────────────────────────────────────────
+  const loadTopicStats = async () => {
+    // Load view counts
+    const { data: viewsData } = await supabase.from("topic_views").select("*");
+    if (viewsData) {
+      const viewMap = {};
+      viewsData.forEach(v => { viewMap[v.topic_id] = v.views; });
+      setTopicViews(viewMap);
+    }
+    // Load post counts per topic
+    const { data: postsData } = await supabase.from("posts").select("topic_id");
+    if (postsData) {
+      const counts = {};
+      postsData.forEach(p => { counts[p.topic_id] = (counts[p.topic_id] || 0) + 1; });
+      setTopicPostCounts(counts);
+    }
+  };
+
+  const loadPosts = async (topicId) => {
+    setPostsLoading(true);
+    const { data } = await supabase
+      .from("posts")
+      .select("*")
+      .eq("topic_id", topicId)
+      .order("created_at", { ascending: true });
+    setPosts(data || []);
+
+    // Load user's likes if logged in
+    if (user) {
+      const { data: likesData } = await supabase
+        .from("likes")
+        .select("post_id")
+        .eq("user_id", user.id);
+      if (likesData) {
+        setLikedPosts(new Set(likesData.map(l => l.post_id)));
+      }
+    }
+    setPostsLoading(false);
+  };
+
+  const incrementTopicViews = async (topicId) => {
+    await supabase.rpc("increment_views", { topic_id_input: topicId }).catch(() => {
+      // Fallback: direct update
+      supabase
+        .from("topic_views")
+        .upsert({ topic_id: topicId, views: (topicViews[topicId] || 0) + 1 });
+    });
+    setTopicViews(prev => ({ ...prev, [topicId]: (prev[topicId] || 0) + 1 }));
+  };
+
+  const submitPost = async () => {
+    if (!newPostText.trim() || !user || postLoading) return;
+    setPostLoading(true);
+    const username = user.email.split("@")[0];
+    const { data, error } = await supabase.from("posts").insert({
+      topic_id: selectedTopic.id,
+      author_id: user.id,
+      username,
+      content: newPostText.trim(),
+    }).select().single();
+    if (!error && data) {
+      setPosts(prev => [...prev, data]);
+      setTopicPostCounts(prev => ({ ...prev, [selectedTopic.id]: (prev[selectedTopic.id] || 0) + 1 }));
+      setNewPostText("");
+    }
+    setPostLoading(false);
+  };
+
+  const toggleLike = async (post) => {
+    if (!user) { setShowAuth(true); return; }
+    const isLiked = likedPosts.has(post.id);
+    if (isLiked) {
+      // Unlike
+      await supabase.from("likes").delete().eq("post_id", post.id).eq("user_id", user.id);
+      await supabase.from("posts").update({ likes: Math.max(0, post.likes - 1) }).eq("id", post.id);
+      setLikedPosts(prev => { const s = new Set(prev); s.delete(post.id); return s; });
+      setPosts(prev => prev.map(p => p.id === post.id ? { ...p, likes: Math.max(0, p.likes - 1) } : p));
+    } else {
+      // Like
+      const { error } = await supabase.from("likes").insert({ post_id: post.id, user_id: user.id });
+      if (!error) {
+        await supabase.from("posts").update({ likes: post.likes + 1 }).eq("id", post.id);
+        setLikedPosts(prev => new Set([...prev, post.id]));
+        setPosts(prev => prev.map(p => p.id === post.id ? { ...p, likes: p.likes + 1 } : p));
+      }
+    }
+  };
+
+  // ─── Auth Functions ────────────────────────────────────────────────────────
+  const handleAuth = async () => {
+    setAuthError("");
+    setAuthLoading(true);
+    if (authMode === "register") {
+      const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword });
+      if (error) setAuthError(error.message);
+      else { setShowAuth(false); setAuthEmail(""); setAuthPassword(""); }
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
+      if (error) setAuthError("Falsche E-Mail oder Passwort.");
+      else { setShowAuth(false); setAuthEmail(""); setAuthPassword(""); }
+    }
+    setAuthLoading(false);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setLikedPosts(new Set());
+  };
+
+  // ─── AI Functions ──────────────────────────────────────────────────────────
   const askAI = async (question, context = "") => {
     const systemPrompt = `Du bist ein Menschenrechtsexperte und hilfst Menschen dabei, ihre Rechte zu verstehen und sich für diese einzusetzen. Antworte auf Deutsch, klar, informativ und engagiert. Beziehe dich auf die UN-Menschenrechtscharta und aktuelle Menschenrechtssituationen weltweit. Halte Antworten prägnant (max 200 Wörter). ${context}`;
-    
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-     headers: {
-  "Content-Type": "application/json",
-  "x-api-key": import.meta.env.VITE_ANTHROPIC_API_KEY,
-  "anthropic-version": "2023-06-01",
-  "anthropic-dangerous-direct-browser-access": "true",
-},
+      headers: {
+        "Content-Type": "application/json",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
         max_tokens: 1000,
@@ -86,8 +309,7 @@ export default function HumanRightsHub() {
     try {
       const context = selectedTopic ? `Das Diskussionsthema ist: "${selectedTopic.title}" in der Kategorie "${selectedTopic.category}".` : "";
       const answer = await askAI(inputMsg, context);
-      const aiMsg = { role: "ai", text: answer, time: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }), name: "MR-Assistent" };
-      setMessages(prev => [...prev, aiMsg]);
+      setMessages(prev => [...prev, { role: "ai", text: answer, time: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }), name: "MR-Assistent" }]);
     } catch {
       setMessages(prev => [...prev, { role: "ai", text: "Verbindungsfehler. Bitte erneut versuchen.", time: "", name: "System" }]);
     }
@@ -102,7 +324,7 @@ export default function HumanRightsHub() {
     setChatInput("");
     setChatLoading(true);
     try {
-      const context = selectedRight ? `Der Nutzer möchte mehr über Artikel ${selectedRight.article}: "${selectedRight.title}" erfahren.` : "Der Nutzer fragt allgemein über Menschenrechte.";
+      const context = selectedRight ? `Der Nutzer möchte mehr über ${selectedRight.article}: "${selectedRight.title}" erfahren.` : "";
       const answer = await askAI(chatInput, context);
       setChatMessages([...newHistory, { role: "ai", text: answer, time: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) }]);
     } catch {
@@ -111,9 +333,10 @@ export default function HumanRightsHub() {
     setChatLoading(false);
   };
 
-  const openTopic = (topic) => {
+  const openTopic = async (topic) => {
     setSelectedTopic(topic);
-    setMessages([{ role: "ai", text: `Willkommen in der Diskussion: **${topic.title}**\n\nDies ist ein wichtiges Thema im Bereich Menschenrechte. Teile deine Gedanken, Fragen oder Erfahrungen. Ich bin hier, um zu informieren und die Diskussion zu bereichern.`, time: "", name: "MR-Assistent" }]);
+    await Promise.all([loadPosts(topic.id), incrementTopicViews(topic.id)]);
+    setMessages([{ role: "ai", text: `Willkommen in der Diskussion: **${topic.title}**\n\nDies ist ein wichtiges Thema im Bereich Menschenrechte. Teile deine Gedanken, Fragen oder Erfahrungen.`, time: "", name: "MR-Assistent" }]);
     setActiveTab("forum-chat");
   };
 
@@ -123,11 +346,11 @@ export default function HumanRightsHub() {
     setActiveTab("rights-chat");
   };
 
-  const styles = {
+  // ─── Styles ────────────────────────────────────────────────────────────────
+  const S = {
     app: { background: "#0D1B2A", minHeight: "100vh", fontFamily: "'Inter', system-ui, sans-serif", color: "#E8E8E8", display: "flex", flexDirection: "column" },
-    header: { background: "linear-gradient(180deg, #0A1520 0%, #0D1B2A 100%)", borderBottom: "1px solid rgba(200,150,62,0.3)", padding: "16px 20px", position: "sticky", top: 0, zIndex: 100 },
+    header: { background: "linear-gradient(180deg, #0A1520 0%, #0D1B2A 100%)", borderBottom: "1px solid rgba(200,150,62,0.3)", padding: "16px 20px", position: "sticky", top: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "space-between" },
     logo: { display: "flex", alignItems: "center", gap: "10px" },
-    logoIcon: { fontSize: "28px" },
     logoText: { fontSize: "20px", fontWeight: "800", letterSpacing: "-0.5px", background: "linear-gradient(135deg, #C8963E, #E8C070)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" },
     tagline: { fontSize: "11px", color: "rgba(200,150,62,0.7)", letterSpacing: "2px", textTransform: "uppercase", marginTop: "2px" },
     nav: { display: "flex", gap: "4px", padding: "8px 12px", borderBottom: "1px solid rgba(255,255,255,0.06)", overflowX: "auto" },
@@ -143,7 +366,7 @@ export default function HumanRightsHub() {
     statLabel: { fontSize: "11px", color: "rgba(255,255,255,0.4)", marginTop: "2px" },
     sectionTitle: { fontSize: "13px", fontWeight: "700", letterSpacing: "2px", textTransform: "uppercase", color: "rgba(200,150,62,0.8)", marginBottom: "16px" },
     grid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "12px" },
-    rightCard: (color) => ({ padding: "18px", borderRadius: "12px", background: "rgba(255,255,255,0.03)", border: `1px solid ${color}30`, cursor: "pointer", transition: "all 0.2s", ":hover": { background: `${color}10` } }),
+    rightCard: (color) => ({ padding: "18px", borderRadius: "12px", background: "rgba(255,255,255,0.03)", border: `1px solid ${color}30`, cursor: "pointer", transition: "all 0.2s" }),
     rightIcon: { fontSize: "24px", marginBottom: "8px" },
     rightArticle: (color) => ({ fontSize: "10px", fontWeight: "700", letterSpacing: "2px", textTransform: "uppercase", color: color, marginBottom: "4px" }),
     rightTitle: { fontSize: "15px", fontWeight: "700", marginBottom: "6px" },
@@ -154,74 +377,115 @@ export default function HumanRightsHub() {
     hotBadge: { padding: "3px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: "700", background: "rgba(224,92,92,0.2)", color: "#E05C5C" },
     topicTitle: { fontSize: "14px", fontWeight: "600", marginBottom: "4px" },
     topicMeta: { fontSize: "11px", color: "rgba(255,255,255,0.35)" },
-    topicPosts: { fontSize: "12px", color: "rgba(255,255,255,0.3)", textAlign: "right", minWidth: "50px" },
     chatContainer: { display: "flex", flexDirection: "column", height: "calc(100vh - 180px)" },
     chatHeader: { padding: "12px 16px", background: "rgba(255,255,255,0.03)", borderRadius: "12px 12px 0 0", border: "1px solid rgba(255,255,255,0.07)", borderBottom: "none", display: "flex", alignItems: "center", gap: "10px" },
     chatBack: { background: "transparent", border: "none", color: "#C8963E", cursor: "pointer", fontSize: "14px", fontWeight: "700", padding: "4px 8px" },
     chatMessages: { flex: 1, overflowY: "auto", padding: "16px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", display: "flex", flexDirection: "column", gap: "12px" },
-    msgBubble: (role) => ({ maxWidth: "85%", alignSelf: role === "user" ? "flex-end" : "flex-start", padding: "12px 14px", borderRadius: role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: role === "user" ? "rgba(200,150,62,0.2)" : "rgba(255,255,255,0.06)", border: `1px solid ${role === "user" ? "rgba(200,150,62,0.3)" : "rgba(255,255,255,0.08)"}`, fontSize: "13px", lineHeight: "1.6" }),
     msgName: { fontSize: "10px", fontWeight: "700", marginBottom: "4px", color: "rgba(200,150,62,0.8)", letterSpacing: "1px", textTransform: "uppercase" },
     msgTime: { fontSize: "10px", color: "rgba(255,255,255,0.25)", marginTop: "4px", textAlign: "right" },
     chatInput: { display: "flex", gap: "8px", padding: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderTop: "1px solid rgba(200,150,62,0.2)", borderRadius: "0 0 12px 12px" },
     input: { flex: 1, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", padding: "10px 14px", color: "#E8E8E8", fontSize: "13px", outline: "none" },
-    sendBtn: { padding: "10px 18px", borderRadius: "8px", border: "none", background: "#C8963E", color: "#0D1B2A", fontWeight: "700", cursor: "pointer", fontSize: "13px" },
+    sendBtn: (disabled) => ({ padding: "10px 18px", borderRadius: "8px", border: "none", background: "#C8963E", color: "#0D1B2A", fontWeight: "700", cursor: disabled ? "not-allowed" : "pointer", fontSize: "13px", opacity: disabled ? 0.5 : 1 }),
     actionGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px" },
     actionCard: (color) => ({ padding: "20px", borderRadius: "12px", background: "rgba(255,255,255,0.03)", border: `1px solid ${color}25`, cursor: "pointer", transition: "all 0.2s" }),
-    actionIcon: { fontSize: "28px", marginBottom: "10px" },
-    actionTitle: { fontSize: "15px", fontWeight: "700", marginBottom: "4px" },
-    actionDesc: { fontSize: "12px", color: "rgba(255,255,255,0.45)", lineHeight: "1.5", marginBottom: "8px" },
-    actionCount: (color) => ({ fontSize: "11px", fontWeight: "700", color: color }),
-    typingDot: { display: "inline-block", animation: "pulse 1s infinite" },
+    // Auth modal
+    overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" },
+    modal: { background: "#0D1B2A", border: "1px solid rgba(200,150,62,0.3)", borderRadius: "16px", padding: "28px", width: "340px", maxWidth: "90vw" },
+    modalTitle: { fontSize: "20px", fontWeight: "800", marginBottom: "20px", textAlign: "center" },
+    authInput: { width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", padding: "12px 14px", color: "#E8E8E8", fontSize: "14px", outline: "none", marginBottom: "12px", boxSizing: "border-box" },
+    authBtn: { width: "100%", padding: "12px", borderRadius: "8px", border: "none", background: "#C8963E", color: "#0D1B2A", fontWeight: "700", cursor: "pointer", fontSize: "14px", marginBottom: "12px" },
+    authSwitch: { textAlign: "center", fontSize: "13px", color: "rgba(255,255,255,0.4)" },
+    authSwitchLink: { color: "#C8963E", cursor: "pointer", fontWeight: "600" },
+    authError: { background: "rgba(224,92,92,0.15)", border: "1px solid rgba(224,92,92,0.3)", borderRadius: "8px", padding: "10px 12px", fontSize: "13px", color: "#E05C5C", marginBottom: "12px" },
+    userBadge: { display: "flex", alignItems: "center", gap: "8px" },
+    username: { fontSize: "13px", color: "rgba(200,150,62,0.8)", fontWeight: "600" },
+    logoutBtn: { background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "6px", padding: "6px 12px", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: "12px" },
+    loginPrompt: { background: "rgba(200,150,62,0.08)", border: "1px solid rgba(200,150,62,0.2)", borderRadius: "8px", padding: "12px 16px", fontSize: "13px", color: "rgba(200,150,62,0.8)", cursor: "pointer", textAlign: "center", marginBottom: "12px" },
   };
+
+  const msgBubbleStyle = (role) => ({
+    maxWidth: "85%",
+    alignSelf: role === "user" ? "flex-end" : "flex-start",
+    padding: "12px 14px",
+    borderRadius: role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+    background: role === "user" ? "rgba(200,150,62,0.18)" : "rgba(255,255,255,0.05)",
+    border: `1px solid ${role === "user" ? "rgba(200,150,62,0.3)" : "rgba(255,255,255,0.08)"}`,
+    fontSize: "13px",
+    lineHeight: "1.6",
+  });
+
+  // ─── Renders ───────────────────────────────────────────────────────────────
+  const renderAuthModal = () => (
+    <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && setShowAuth(false)}>
+      <div style={S.modal}>
+        <div style={S.modalTitle}>{authMode === "login" ? "Anmelden" : "Registrieren"}</div>
+        {authError && <div style={S.authError}>{authError}</div>}
+        <input style={S.authInput} type="email" placeholder="E-Mail" value={authEmail}
+          onChange={e => setAuthEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && handleAuth()} />
+        <input style={S.authInput} type="password" placeholder="Passwort" value={authPassword}
+          onChange={e => setAuthPassword(e.target.value)} onKeyDown={e => e.key === "Enter" && handleAuth()} />
+        <button style={S.authBtn} onClick={handleAuth} disabled={authLoading}>
+          {authLoading ? "Laden..." : authMode === "login" ? "Anmelden" : "Registrieren"}
+        </button>
+        <div style={S.authSwitch}>
+          {authMode === "login" ? "Noch kein Konto? " : "Bereits registriert? "}
+          <span style={S.authSwitchLink} onClick={() => { setAuthMode(authMode === "login" ? "register" : "login"); setAuthError(""); }}>
+            {authMode === "login" ? "Registrieren" : "Anmelden"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
 
   const renderHome = () => (
     <div>
-      <div style={styles.hero}>
-        <div style={styles.heroQuote}>
+      <div style={S.hero}>
+        <div style={S.heroQuote}>
           „Alle Menschen sind frei und gleich an Würde und Rechten geboren."
           <div style={{ fontSize: "11px", marginTop: "8px", color: "rgba(200,150,62,0.6)" }}>— UN-Menschenrechtscharta, Artikel 1</div>
         </div>
-        <h1 style={styles.heroTitle}>Deine Rechte.<br />Deine Stimme.</h1>
-        <p style={styles.heroSub}>Informiere dich, diskutiere und handle – für Menschenrechte weltweit.</p>
-        <div style={styles.statsRow}>
+        <h1 style={S.heroTitle}>Deine Rechte.<br />Deine Stimme.</h1>
+        <p style={S.heroSub}>Informiere dich, diskutiere und handle – für Menschenrechte weltweit.</p>
+        <div style={S.statsRow}>
           {[["30", "Grundrechte"], ["193", "UN-Staaten"], ["8 Mrd.", "Menschen"], ["70+", "Jahre Kampf"]].map(([n, l]) => (
-            <div key={l} style={styles.stat}><div style={styles.statNum}>{n}</div><div style={styles.statLabel}>{l}</div></div>
+            <div key={l} style={S.stat}><div style={S.statNum}>{n}</div><div style={S.statLabel}>{l}</div></div>
           ))}
         </div>
       </div>
 
       <div style={{ marginBottom: "32px" }}>
-        <div style={styles.sectionTitle}>🔥 Aktuelle Diskussionen</div>
-        <div style={styles.forumList}>
-          {FORUM_TOPICS.filter(t => t.hot).slice(0, 3).map(topic => (
-            <div key={topic.id} style={styles.topicCard} onClick={() => openTopic(topic)}
+        <div style={S.sectionTitle}>🔥 Aktuelle Diskussionen</div>
+        <div style={S.forumList}>
+          {FORUM_TOPICS.filter(t => t.hot).map(topic => (
+            <div key={topic.id} style={S.topicCard} onClick={() => openTopic(topic)}
               onMouseEnter={e => e.currentTarget.style.background = "rgba(200,150,62,0.06)"}
               onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}>
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", gap: "6px", marginBottom: "6px", flexWrap: "wrap" }}>
-                  <span style={styles.topicBadge(topic.category)}>{topic.category}</span>
-                  {topic.hot && <span style={styles.hotBadge}>🔥 Trending</span>}
+                  <span style={S.topicBadge(topic.category)}>{topic.category}</span>
+                  <span style={S.hotBadge}>🔥 Trending</span>
                 </div>
-                <div style={styles.topicTitle}>{topic.title}</div>
-                <div style={styles.topicMeta}>{topic.author} · {topic.time}</div>
+                <div style={S.topicTitle}>{topic.title}</div>
+                <div style={S.topicMeta}>👁 {topicViews[topic.id] || 0} Aufrufe</div>
               </div>
-              <div style={styles.topicPosts}><div style={{ fontSize: "16px", fontWeight: "700", color: "#C8963E" }}>{topic.posts}</div><div style={{ fontSize: "10px" }}>Beiträge</div></div>
+              <div style={{ textAlign: "right", minWidth: "50px" }}>
+                <div style={{ fontSize: "16px", fontWeight: "700", color: "#C8963E" }}>{topicPostCounts[topic.id] || 0}</div>
+                <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>Beiträge</div>
+              </div>
             </div>
           ))}
         </div>
       </div>
 
       <div>
-        <div style={styles.sectionTitle}>✊ Jetzt handeln</div>
-        <div style={styles.actionGrid}>
+        <div style={S.sectionTitle}>✊ Jetzt handeln</div>
+        <div style={S.actionGrid}>
           {ACTIONS.slice(0, 2).map(action => (
-            <div key={action.title} style={styles.actionCard(action.color)}
-              onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
-              onMouseLeave={e => e.currentTarget.style.transform = "none"}>
-              <div style={styles.actionIcon}>{action.icon}</div>
-              <div style={styles.actionTitle}>{action.title}</div>
-              <div style={styles.actionDesc}>{action.desc}</div>
-              <div style={styles.actionCount(action.color)}>{action.count} →</div>
+            <div key={action.title} style={S.actionCard(action.color)}>
+              <div style={{ fontSize: "28px", marginBottom: "10px" }}>{action.icon}</div>
+              <div style={{ fontSize: "15px", fontWeight: "700", marginBottom: "4px" }}>{action.title}</div>
+              <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.45)", lineHeight: "1.5", marginBottom: "8px" }}>{action.desc}</div>
+              <div style={{ fontSize: "11px", fontWeight: "700", color: action.color }}>{action.count}</div>
             </div>
           ))}
         </div>
@@ -235,15 +499,15 @@ export default function HumanRightsHub() {
         <h2 style={{ fontSize: "22px", fontWeight: "800", marginBottom: "6px" }}>Deine Grundrechte</h2>
         <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)" }}>Klicke auf ein Recht, um mehr zu erfahren und Fragen zu stellen.</p>
       </div>
-      <div style={styles.grid}>
+      <div style={S.grid}>
         {RIGHTS.map(right => (
-          <div key={right.id} style={styles.rightCard(right.color)} onClick={() => openRight(right)}
+          <div key={right.id} style={S.rightCard(right.color)} onClick={() => openRight(right)}
             onMouseEnter={e => { e.currentTarget.style.background = `${right.color}12`; e.currentTarget.style.transform = "translateY(-2px)"; }}
             onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; e.currentTarget.style.transform = "none"; }}>
-            <div style={styles.rightIcon}>{right.icon}</div>
-            <div style={styles.rightArticle(right.color)}>{right.article}</div>
-            <div style={styles.rightTitle}>{right.title}</div>
-            <div style={styles.rightDesc}>{right.desc.substring(0, 80)}…</div>
+            <div style={S.rightIcon}>{right.icon}</div>
+            <div style={S.rightArticle(right.color)}>{right.article}</div>
+            <div style={S.rightTitle}>{right.title}</div>
+            <div style={S.rightDesc}>{right.desc.substring(0, 80)}…</div>
           </div>
         ))}
       </div>
@@ -254,24 +518,26 @@ export default function HumanRightsHub() {
     <div>
       <div style={{ marginBottom: "20px" }}>
         <h2 style={{ fontSize: "22px", fontWeight: "800", marginBottom: "6px" }}>Diskussionen & Forum</h2>
-        <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)" }}>Tritt einer Diskussion bei – ein KI-Assistent hilft mit Fakten & Hintergrundwissen.</p>
+        <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)" }}>Tritt einer Diskussion bei – reale Beiträge von der Community.</p>
       </div>
-      <div style={styles.forumList}>
+      <div style={S.forumList}>
         {FORUM_TOPICS.map(topic => (
-          <div key={topic.id} style={styles.topicCard} onClick={() => openTopic(topic)}
+          <div key={topic.id} style={S.topicCard} onClick={() => openTopic(topic)}
             onMouseEnter={e => e.currentTarget.style.background = "rgba(200,150,62,0.06)"}
             onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}>
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", gap: "6px", marginBottom: "6px", flexWrap: "wrap" }}>
-                <span style={styles.topicBadge(topic.category)}>{topic.category}</span>
-                {topic.hot && <span style={styles.hotBadge}>🔥</span>}
+                <span style={S.topicBadge(topic.category)}>{topic.category}</span>
+                {topic.hot && <span style={S.hotBadge}>🔥</span>}
               </div>
-              <div style={styles.topicTitle}>{topic.title}</div>
-              <div style={styles.topicMeta}>{topic.author} · {topic.time}</div>
+              <div style={S.topicTitle}>{topic.title}</div>
+              <div style={S.topicMeta}>
+                👁 {topicViews[topic.id] || 0} Aufrufe
+              </div>
             </div>
-            <div style={styles.topicPosts}>
-              <div style={{ fontSize: "16px", fontWeight: "700", color: "#C8963E" }}>{topic.posts}</div>
-              <div style={{ fontSize: "10px" }}>Beiträge</div>
+            <div style={{ textAlign: "right", minWidth: "50px" }}>
+              <div style={{ fontSize: "16px", fontWeight: "700", color: "#C8963E" }}>{topicPostCounts[topic.id] || 0}</div>
+              <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)" }}>Beiträge</div>
             </div>
           </div>
         ))}
@@ -280,69 +546,124 @@ export default function HumanRightsHub() {
   );
 
   const renderForumChat = () => (
-    <div style={styles.chatContainer}>
-      <div style={styles.chatHeader}>
-        <button style={styles.chatBack} onClick={() => setActiveTab("forum")}>← Zurück</button>
-        <div>
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px", height: "calc(100vh - 180px)" }}>
+      {/* Topic Header */}
+      <div style={S.chatHeader}>
+        <button style={S.chatBack} onClick={() => setActiveTab("forum")}>← Zurück</button>
+        <div style={{ flex: 1 }}>
           <div style={{ fontSize: "14px", fontWeight: "700" }}>{selectedTopic?.title}</div>
-          <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>{selectedTopic?.category}</div>
+          <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>
+            {selectedTopic?.category} · 👁 {topicViews[selectedTopic?.id] || 0} Aufrufe
+          </div>
         </div>
       </div>
-      <div style={styles.chatMessages}>
-        {messages.map((msg, i) => (
-          <div key={i} style={msgBubbleStyle(msg.role)}>
-            {msg.role === "ai" && <div style={styles.msgName}>{msg.name}</div>}
-            <div style={{ whiteSpace: "pre-wrap" }}>{msg.text}</div>
-            {msg.time && <div style={styles.msgTime}>{msg.time}</div>}
-          </div>
-        ))}
-        {aiLoading && (
-          <div style={msgBubbleStyle("ai")}>
-            <div style={styles.msgName}>MR-Assistent</div>
-            <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px" }}>schreibt<span style={{ animation: "pulse 1s infinite" }}>...</span></div>
+
+      {/* Community Posts */}
+      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "10px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", padding: "14px" }}>
+        {postsLoading && <div style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: "13px" }}>Lade Beiträge…</div>}
+        {!postsLoading && posts.length === 0 && (
+          <div style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: "13px", padding: "20px" }}>
+            Noch keine Beiträge. Sei die erste Person, die schreibt!
           </div>
         )}
-        <div ref={messagesEndRef} />
+        {posts.map(post => (
+          <div key={post.id} style={{ background: "rgba(255,255,255,0.04)", borderRadius: "10px", padding: "12px 14px", border: "1px solid rgba(255,255,255,0.07)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+              <span style={{ fontSize: "12px", fontWeight: "700", color: "#C8963E" }}>{post.username}</span>
+              <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)" }}>
+                {new Date(post.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+              </span>
+            </div>
+            <div style={{ fontSize: "13px", lineHeight: "1.6", marginBottom: "10px" }}>{post.content}</div>
+            <button
+              onClick={() => toggleLike(post)}
+              style={{ background: likedPosts.has(post.id) ? "rgba(200,150,62,0.2)" : "rgba(255,255,255,0.05)", border: `1px solid ${likedPosts.has(post.id) ? "rgba(200,150,62,0.4)" : "rgba(255,255,255,0.1)"}`, borderRadius: "6px", padding: "4px 10px", cursor: "pointer", color: likedPosts.has(post.id) ? "#C8963E" : "rgba(255,255,255,0.4)", fontSize: "12px", fontWeight: "600" }}
+            >
+              👍 {post.likes}
+            </button>
+          </div>
+        ))}
+        <div ref={postsEndRef} />
       </div>
-      <div style={styles.chatInput}>
-        <input style={styles.input} value={inputMsg} onChange={e => setInputMsg(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && sendForumMessage()}
-          placeholder="Dein Beitrag oder Frage..." />
-        <button style={{ ...styles.sendBtn, opacity: aiLoading ? 0.5 : 1 }} onClick={sendForumMessage} disabled={aiLoading}>Senden</button>
+
+      {/* New Post Input */}
+      {user ? (
+        <div style={{ display: "flex", gap: "8px" }}>
+          <input
+            style={S.input}
+            value={newPostText}
+            onChange={e => setNewPostText(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && submitPost()}
+            placeholder="Dein Beitrag zur Diskussion…"
+          />
+          <button style={S.sendBtn(postLoading || !newPostText.trim())} onClick={submitPost} disabled={postLoading || !newPostText.trim()}>
+            Posten
+          </button>
+        </div>
+      ) : (
+        <div style={S.loginPrompt} onClick={() => setShowAuth(true)}>
+          🔐 Anmelden, um an der Diskussion teilzunehmen
+        </div>
+      )}
+
+      {/* AI Assistant */}
+      <div style={{ borderTop: "1px solid rgba(200,150,62,0.15)", paddingTop: "12px" }}>
+        <div style={{ fontSize: "11px", fontWeight: "700", letterSpacing: "1px", textTransform: "uppercase", color: "rgba(200,150,62,0.6)", marginBottom: "8px" }}>🤖 KI-Assistent befragen</div>
+        <div style={{ maxHeight: "180px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "8px", marginBottom: "8px" }}>
+          {messages.map((msg, i) => (
+            <div key={i} style={msgBubbleStyle(msg.role)}>
+              {msg.role === "ai" && <div style={S.msgName}>{msg.name}</div>}
+              <div style={{ whiteSpace: "pre-wrap" }}>{msg.text}</div>
+            </div>
+          ))}
+          {aiLoading && (
+            <div style={msgBubbleStyle("ai")}>
+              <div style={S.msgName}>MR-Assistent</div>
+              <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px" }}>schreibt...</div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <input style={S.input} value={inputMsg} onChange={e => setInputMsg(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && sendForumMessage()}
+            placeholder="Frage an den KI-Assistenten..." />
+          <button style={S.sendBtn(aiLoading)} onClick={sendForumMessage} disabled={aiLoading}>Fragen</button>
+        </div>
       </div>
     </div>
   );
 
   const renderRightsChat = () => (
-    <div style={styles.chatContainer}>
-      <div style={styles.chatHeader}>
-        <button style={styles.chatBack} onClick={() => setActiveTab("rights")}>← Zurück</button>
+    <div style={S.chatContainer}>
+      <div style={S.chatHeader}>
+        <button style={S.chatBack} onClick={() => setActiveTab("rights")}>← Zurück</button>
         <div>
           <div style={{ fontSize: "14px", fontWeight: "700" }}>{selectedRight?.icon} {selectedRight?.title}</div>
           <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.35)" }}>{selectedRight?.article} – UN-Menschenrechtscharta</div>
         </div>
       </div>
-      <div style={styles.chatMessages}>
+      <div style={S.chatMessages}>
         {chatMessages.map((msg, i) => (
           <div key={i} style={msgBubbleStyle(msg.role)}>
-            {msg.role === "ai" && <div style={styles.msgName}>MR-Experte</div>}
+            {msg.role === "ai" && <div style={S.msgName}>MR-Experte</div>}
             <div style={{ whiteSpace: "pre-wrap" }}>{msg.text}</div>
-            {msg.time && <div style={styles.msgTime}>{msg.time}</div>}
+            {msg.time && <div style={S.msgTime}>{msg.time}</div>}
           </div>
         ))}
         {chatLoading && (
           <div style={msgBubbleStyle("ai")}>
-            <div style={styles.msgName}>MR-Experte</div>
+            <div style={S.msgName}>MR-Experte</div>
             <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "13px" }}>analysiert...</div>
           </div>
         )}
         <div ref={chatEndRef} />
       </div>
-      <div style={styles.chatInput}>
-        <input style={styles.input} value={chatInput} onChange={e => setChatInput(e.target.value)}
+      <div style={S.chatInput}>
+        <input style={S.input} value={chatInput} onChange={e => setChatInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && sendChatMessage()}
           placeholder="Frage stellen..." />
-        <button style={{ ...styles.sendBtn, opacity: chatLoading ? 0.5 : 1 }} onClick={sendChatMessage} disabled={chatLoading}>Fragen</button>
+        <button style={S.sendBtn(chatLoading)} onClick={sendChatMessage} disabled={chatLoading}>Fragen</button>
       </div>
     </div>
   );
@@ -353,9 +674,9 @@ export default function HumanRightsHub() {
         <h2 style={{ fontSize: "22px", fontWeight: "800", marginBottom: "6px" }}>Für Rechte kämpfen</h2>
         <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)" }}>Jede Stimme zählt. Wähle, wie du aktiv werden möchtest.</p>
       </div>
-      <div style={styles.actionGrid}>
+      <div style={S.actionGrid}>
         {ACTIONS.map(action => (
-          <div key={action.title} style={{ ...styles.actionCard(action.color), padding: "24px" }}
+          <div key={action.title} style={{ ...S.actionCard(action.color), padding: "24px" }}
             onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.background = `${action.color}08`; }}
             onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}>
             <div style={{ fontSize: "32px", marginBottom: "12px" }}>{action.icon}</div>
@@ -377,17 +698,6 @@ export default function HumanRightsHub() {
     </div>
   );
 
-  const msgBubbleStyle = (role) => ({
-    maxWidth: "85%",
-    alignSelf: role === "user" ? "flex-end" : "flex-start",
-    padding: "12px 14px",
-    borderRadius: role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-    background: role === "user" ? "rgba(200,150,62,0.18)" : "rgba(255,255,255,0.05)",
-    border: `1px solid ${role === "user" ? "rgba(200,150,62,0.3)" : "rgba(255,255,255,0.08)"}`,
-    fontSize: "13px",
-    lineHeight: "1.6",
-  });
-
   const tabs = [
     { id: "home", label: "🏠 Home" },
     { id: "rights", label: "📜 Rechte" },
@@ -398,29 +708,52 @@ export default function HumanRightsHub() {
   const isChatView = activeTab === "forum-chat" || activeTab === "rights-chat";
 
   return (
-    <div style={styles.app}>
-      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} } * { box-sizing: border-box; } ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: rgba(200,150,62,0.3); border-radius: 4px; }`}</style>
-      <div style={styles.header}>
-        <div style={styles.logo}>
-          <span style={styles.logoIcon}>🌍</span>
+    <div style={S.app}>
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        * { box-sizing: border-box; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(200,150,62,0.3); border-radius: 4px; }
+      `}</style>
+
+      {showAuth && renderAuthModal()}
+
+      <div style={S.header}>
+        <div style={S.logo}>
+          <span style={{ fontSize: "28px" }}>🌍</span>
           <div>
-            <div style={styles.logoText}>Human Rights Hub</div>
-            <div style={styles.tagline}>Informieren · Diskutieren · Handeln</div>
+            <div style={S.logoText}>Human Rights Hub</div>
+            <div style={S.tagline}>Informieren · Diskutieren · Handeln</div>
           </div>
+        </div>
+        {/* Auth area */}
+        <div>
+          {user ? (
+            <div style={S.userBadge}>
+              <span style={S.username}>👤 {user.email.split("@")[0]}</span>
+              <button style={S.logoutBtn} onClick={handleLogout}>Abmelden</button>
+            </div>
+          ) : (
+            <button style={{ background: "rgba(200,150,62,0.15)", border: "1px solid rgba(200,150,62,0.3)", borderRadius: "8px", padding: "7px 14px", color: "#C8963E", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}
+              onClick={() => setShowAuth(true)}>
+              Anmelden
+            </button>
+          )}
         </div>
       </div>
 
       {!isChatView && (
-        <div style={styles.nav}>
+        <div style={S.nav}>
           {tabs.map(tab => (
-            <button key={tab.id} style={styles.navBtn(activeTab === tab.id)} onClick={() => setActiveTab(tab.id)}>
+            <button key={tab.id} style={S.navBtn(activeTab === tab.id)} onClick={() => setActiveTab(tab.id)}>
               {tab.label}
             </button>
           ))}
         </div>
       )}
 
-      <div style={{ ...styles.content, padding: isChatView ? "12px" : "20px" }}>
+      <div style={{ ...S.content, padding: isChatView ? "12px" : "20px" }}>
         {activeTab === "home" && renderHome()}
         {activeTab === "rights" && renderRights()}
         {activeTab === "forum" && renderForum()}
