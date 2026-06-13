@@ -271,7 +271,13 @@ if (hash.includes("access_token") && hash.includes("type=signup")) {
     setAuthLoading(true);
     if (authMode === "register") {
       const { error } = await supabase.auth.signUp({ email: authEmail, password: authPassword });
-      if (error) setAuthError(error.message);
+      if (error) {
+  if (error.message.includes("rate limit")) {
+    setAuthError("Zu viele Versuche. Bitte warte 1 Stunde und versuche es erneut.");
+  } else {
+    setAuthError(error.message);
+  }
+}
 else { setAuthError("Bitte bestätige deine E-Mail-Adresse. Wir haben dir eine E-Mail geschickt!"); }    } else {
       const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
       if (error) setAuthError("Falsche E-Mail oder Passwort.");
