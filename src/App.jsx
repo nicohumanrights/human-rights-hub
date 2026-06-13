@@ -523,7 +523,7 @@ const [briefText, setBriefText] = useState("");
       </div>
       <div style={S.forumList}>
         {FORUM_TOPICS.map(topic => (
-          <div key={topic.id} style={S.topicCard} onClick={() => openTopic(topic)}
+          <div key={topic.id} style={{...S.topicCard, cursor: "pointer"}} onClick={() => openTopic(topic)}
             onMouseEnter={e => e.currentTarget.style.background = "rgba(200,150,62,0.06)"}
             onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}>
             <div style={{ flex: 1 }}>
