@@ -846,6 +846,7 @@ Ich erwarte Ihre Stellungnahme und verbleibe mit freundlichen Grüßen,
     { id: "rights", label: "📜 Rechte" },
     { id: "forum", label: "💬 Forum" },
     { id: "actions", label: "✊ Handeln" },
+    { id: "shop", label: "🛍️ Shop" },
   ];
 
   const isChatView = activeTab === "forum-chat" || activeTab === "rights-chat";
@@ -907,6 +908,19 @@ Ich erwarte Ihre Stellungnahme und verbleibe mit freundlichen Grüßen,
         {activeTab === "forum-chat" && renderForumChat()}
         {activeTab === "rights-chat" && renderRightsChat()}
         {activeTab === "actions" && renderActions()}
+        {activeTab === "shop" && (
+  <div>
+    <div style={{ marginBottom: "20px" }}>
+      <h2 style={{ fontSize: "22px", fontWeight: "800", marginBottom: "6px" }}>🛍️ Merch Shop</h2>
+      <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)" }}>Unterstütze die Bewegung mit Menschenrechts-Merchandise</p>
+    </div>
+    <iframe
+      src="https://human-rights-hub-merch.myspreadshop.de"
+      style={{ width: "100%", height: "800px", border: "none", borderRadius: "12px" }}
+      title="Human Rights Hub Merch Shop"
+    />
+  </div>
+)}
       </div>
     </div>
   );
