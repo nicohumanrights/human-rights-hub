@@ -190,7 +190,7 @@ if (hash.includes("access_token") && hash.includes("type=signup")) {
       setBlogPosts(data || []);
       setBlogLoading(false);
     });
-
+}, []);
   // ─── Supabase Functions ────────────────────────────────────────────────────
   const loadTopicStats = async () => {
     // Load view counts
