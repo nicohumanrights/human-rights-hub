@@ -52,6 +52,10 @@ export default function HumanRightsHub() {
   const [newContent, setNewContent] = useState("");
   const [newImageUrl, setNewImageUrl] = useState("");
   const [postingBlog, setPostingBlog] = useState(false);
+const [editMode, setEditMode] = useState(false);
+const [editTitle, setEditTitle] = useState("");
+const [editContent, setEditContent] = useState("");
+const [editImageUrl, setEditImageUrl] = useState("");
 
   // Auth state
   const [user, setUser] = useState(null);
@@ -298,6 +302,14 @@ export default function HumanRightsHub() {
     setPostingBlog(false);
   };
 
+  const updateBlogPost = async (id, title, content, image_url) => {
+  const { data, error } = await supabase.from("blog_posts").update({ title, content, image_url }).eq("id", id).select().single();
+  if (!error && data) {
+    setBlogPosts(prev => prev.map(p => p.id === id ? data : p));
+    setSelectedPost(data);
+    setEditMode(false);
+  }
+};
   const deleteBlogPost = async (id) => {
     await supabase.from("blog_posts").delete().eq("id", id);
     setBlogPosts(prev => prev.filter(p => p.id !== id));
@@ -701,6 +713,29 @@ export default function HumanRightsHub() {
             🗑️ Beitrag löschen
           </button>
         )}
+        {isAdmin && !editMode && (
+  <button onClick={() => { setEditMode(true); setEditTitle(selectedPost.title); setEditContent(selectedPost.content); setEditImageUrl(selectedPost.image_url || ""); }}
+    style={{ marginTop: "10px", marginLeft: "10px", padding: "10px 20px", borderRadius: "8px", border: "1px solid rgba(200,150,62,0.3)", background: "rgba(200,150,62,0.1)", color: "#C8963E", cursor: "pointer", fontSize: "13px", fontWeight: "700" }}>
+    ✏️ Bearbeiten
+  </button>
+)}
+{isAdmin && editMode && (
+  <div style={{ marginTop: "20px", padding: "20px", background: "rgba(200,150,62,0.06)", border: "1px solid rgba(200,150,62,0.2)", borderRadius: "12px" }}>
+    <input style={{ ...S.input, width: "100%", marginBottom: "10px", boxSizing: "border-box" }} value={editTitle} onChange={e => setEditTitle(e.target.value)} placeholder="Titel" />
+    <input style={{ ...S.input, width: "100%", marginBottom: "10px", boxSizing: "border-box" }} value={editImageUrl} onChange={e => setEditImageUrl(e.target.value)} placeholder="Bild-URL (optional)" />
+    <textarea style={{ ...S.input, width: "100%", minHeight: "200px", resize: "vertical", boxSizing: "border-box" }} value={editContent} onChange={e => setEditContent(e.target.value)} />
+    <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+      <button onClick={() => updateBlogPost(selectedPost.id, editTitle, editContent, editImageUrl)}
+        style={{ padding: "10px 20px", borderRadius: "8px", border: "none", background: "#C8963E", color: "#0D1B2A", fontWeight: "700", cursor: "pointer", fontSize: "13px" }}>
+        💾 Speichern
+      </button>
+      <button onClick={() => setEditMode(false)}
+        style={{ padding: "10px 20px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: "13px" }}>
+        Abbrechen
+      </button>
+    </div>
+  </div>
+)}
       </div>
     );
 
