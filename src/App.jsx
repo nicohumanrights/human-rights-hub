@@ -700,11 +700,6 @@ else { setAuthError("Bitte bestätige deine E-Mail-Adresse. Wir haben dir eine E
       </div>
     </div>
   );
-const renderBlog = () => {
-  
-
-  
-  }, []);
 
   const submitBlogPost = async () => {
     if (!newTitle.trim() || !newContent.trim()) return;
