@@ -1034,7 +1034,7 @@ const renderBlog = () => {
     </div>
   );
 };
-  const tabs = [
+const tabs = [
     { id: "home", label: "🏠 Home" },
     { id: "rights", label: "📜 Rechte" },
     { id: "forum", label: "💬 Forum" },
