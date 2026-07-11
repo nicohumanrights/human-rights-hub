@@ -1035,87 +1035,87 @@ const renderBlog = () => {
   );
 };
 const tabs = [
-    { id: "home", label: "🏠 Home" },
-    { id: "rights", label: "📜 Rechte" },
-    { id: "forum", label: "💬 Forum" },
-    { id: "actions", label: "✊ Handeln" },
-    { id: "shop", label: "🛍️ Shop" },
-    { id: "blog", label: "📰 Blog" },
-  ];
+  { id: "home", label: "🏠 Home" },
+  { id: "rights", label: "📜 Rechte" },
+  { id: "forum", label: "💬 Forum" },
+  { id: "actions", label: "✊ Handeln" },
+  { id: "shop", label: "🛍️ Shop" },
+  { id: "blog", label: "📰 Blog" },
+];
 
-  const isChatView = activeTab === "forum-chat" || activeTab === "rights-chat";
+const isChatView = activeTab === "forum-chat" || activeTab === "rights-chat";
 
-  return (
-    <div style={S.app}>
-      <style>{`
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-        * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(200,150,62,0.3); border-radius: 4px; }
-      `}</style>
+return (
+  <div style={S.app}>
+    <style>{`
+      @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+      * { box-sizing: border-box; }
+      ::-webkit-scrollbar { width: 4px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(200,150,62,0.3); border-radius: 4px; }
+    `}</style>
 
-      {showAuth && renderAuthModal()}
+    {showAuth && renderAuthModal()}
 {emailConfirmed && (
-  <div style={{ position: "fixed", top: "20px", left: "50%", transform: "translateX(-50%)", background: "rgba(107,174,117,0.95)", border: "1px solid #6BAE75", borderRadius: "12px", padding: "16px 24px", zIndex: 300, fontSize: "15px", fontWeight: "700", color: "#fff", boxShadow: "0 8px 32px rgba(0,0,0,0.3)" }}>
-    ✅ E-Mail erfolgreich bestätigt! Willkommen beim Human Rights Hub.
-  </div>
+<div style={{ position: "fixed", top: "20px", left: "50%", transform: "translateX(-50%)", background: "rgba(107,174,117,0.95)", border: "1px solid #6BAE75", borderRadius: "12px", padding: "16px 24px", zIndex: 300, fontSize: "15px", fontWeight: "700", color: "#fff", boxShadow: "0 8px 32px rgba(0,0,0,0.3)" }}>
+  ✅ E-Mail erfolgreich bestätigt! Willkommen beim Human Rights Hub.
+</div>
 )}
-      <div style={S.header}>
-        <div style={S.logo}>
-          <span style={{ fontSize: "28px" }}>🌍</span>
-          <div>
-            <div style={S.logoText}>Human Rights Hub</div>
-            <div style={S.tagline}>Informieren · Diskutieren · Handeln</div>
-          </div>
-        </div>
-        {/* Auth area */}
+    <div style={S.header}>
+      <div style={S.logo}>
+        <span style={{ fontSize: "28px" }}>🌍</span>
         <div>
-          {user ? (
-            <div style={S.userBadge}>
-              <span style={S.username}>👤 {user.email.split("@")[0]}</span>
-              <button style={S.logoutBtn} onClick={handleLogout}>Abmelden</button>
-            </div>
-          ) : (
-            <button style={{ background: "rgba(200,150,62,0.15)", border: "1px solid rgba(200,150,62,0.3)", borderRadius: "8px", padding: "7px 14px", color: "#C8963E", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}
-              onClick={() => setShowAuth(true)}>
-              Anmelden
-            </button>
-          )}
+          <div style={S.logoText}>Human Rights Hub</div>
+          <div style={S.tagline}>Informieren · Diskutieren · Handeln</div>
         </div>
       </div>
-
-      {!isChatView && (
-        <div style={S.nav}>
-          {tabs.map(tab => (
-            <button key={tab.id} style={S.navBtn(activeTab === tab.id)} onClick={() => setActiveTab(tab.id)}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div style={{ ...S.content, padding: isChatView ? "12px" : "20px" }}>
-        {activeTab === "home" && renderHome()}
-        {activeTab === "rights" && renderRights()}
-        {activeTab === "forum" && renderForum()}
-        {activeTab === "forum-chat" && renderForumChat()}
-        {activeTab === "rights-chat" && renderRightsChat()}
-        {activeTab === "actions" && renderActions()}
-        {activeTab === "shop" && (
-  <div>
-    <div style={{ marginBottom: "20px" }}>
-      <h2 style={{ fontSize: "22px", fontWeight: "800", marginBottom: "6px" }}>🛍️ Merch Shop</h2>
-      <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)" }}>Unterstütze die Bewegung mit Menschenrechts-Merchandise</p>
+      {/* Auth area */}
+      <div>
+        {user ? (
+          <div style={S.userBadge}>
+            <span style={S.username}>👤 {user.email.split("@")[0]}</span>
+            <button style={S.logoutBtn} onClick={handleLogout}>Abmelden</button>
+          </div>
+        ) : (
+          <button style={{ background: "rgba(200,150,62,0.15)", border: "1px solid rgba(200,150,62,0.3)", borderRadius: "8px", padding: "7px 14px", color: "#C8963E", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}
+            onClick={() => setShowAuth(true)}>
+            Anmelden
+          </button>
+        )}
+      </div>
     </div>
-    <iframe
-      src="https://human-rights-hub-merch.myspreadshop.de"
-      style={{ width: "100%", height: "800px", border: "none", borderRadius: "12px" }}
-      title="Human Rights Hub Merch Shop"
-    />
+
+    {!isChatView && (
+      <div style={S.nav}>
+        {tabs.map(tab => (
+          <button key={tab.id} style={S.navBtn(activeTab === tab.id)} onClick={() => setActiveTab(tab.id)}>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+    )}
+
+    <div style={{ ...S.content, padding: isChatView ? "12px" : "20px" }}>
+      {activeTab === "home" && renderHome()}
+      {activeTab === "rights" && renderRights()}
+      {activeTab === "forum" && renderForum()}
+      {activeTab === "forum-chat" && renderForumChat()}
+      {activeTab === "rights-chat" && renderRightsChat()}
+      {activeTab === "actions" && renderActions()}
+      {activeTab === "shop" && (
+<div>
+  <div style={{ marginBottom: "20px" }}>
+    <h2 style={{ fontSize: "22px", fontWeight: "800", marginBottom: "6px" }}>🛍️ Merch Shop</h2>
+    <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)" }}>Unterstütze die Bewegung mit Menschenrechts-Merchandise</p>
   </div>
+  <iframe
+    src="https://human-rights-hub-merch.myspreadshop.de"
+    style={{ width: "100%", height: "800px", border: "none", borderRadius: "12px" }}
+    title="Human Rights Hub Merch Shop"
+  />
+</div>
 )}
-      </div>
     </div>
-  );
+  </div>
+);
 }
