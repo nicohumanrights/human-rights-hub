@@ -115,6 +115,14 @@ export default function HumanRightsHub() {
 const [activeAction, setActiveAction] = useState(null);
 const [emailConfirmed, setEmailConfirmed] = useState(false);
 const [briefText, setBriefText] = useState("");
+const [blogPosts, setBlogPosts] = useState([]);
+  const [blogLoading, setBlogLoading] = useState(true);
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [showNewPost, setShowNewPost] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newContent, setNewContent] = useState("");
+  const [newImageUrl, setNewImageUrl] = useState("");
+  const [postingBlog, setPostingBlog] = useState(false);
   // Auth state
   const [user, setUser] = useState(null);
   const [authMode, setAuthMode] = useState("login"); // "login" | "register"
@@ -177,6 +185,11 @@ if (hash.includes("access_token") && hash.includes("type=signup")) {
   useEffect(() => {
     postsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [posts]);
+  useEffect(() => {
+    supabase.from("blog_posts").select("*").order("created_at", { ascending: false }).then(({ data }) => {
+      setBlogPosts(data || []);
+      setBlogLoading(false);
+    });
 
   // ─── Supabase Functions ────────────────────────────────────────────────────
   const loadTopicStats = async () => {
@@ -688,20 +701,9 @@ else { setAuthError("Bitte bestätige deine E-Mail-Adresse. Wir haben dir eine E
     </div>
   );
 const renderBlog = () => {
-  const [blogPosts, setBlogPosts] = useState([]);
-  const [blogLoading, setBlogLoading] = useState(true);
-  const [selectedPost, setSelectedPost] = useState(null);
-  const [showNewPost, setShowNewPost] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newContent, setNewContent] = useState("");
-  const [newImageUrl, setNewImageUrl] = useState("");
-  const [postingBlog, setPostingBlog] = useState(false);
+  
 
-  useEffect(() => {
-    supabase.from("blog_posts").select("*").order("created_at", { ascending: false }).then(({ data }) => {
-      setBlogPosts(data || []);
-      setBlogLoading(false);
-    });
+  
   }, []);
 
   const submitBlogPost = async () => {
