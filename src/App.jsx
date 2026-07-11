@@ -955,7 +955,85 @@ Ich erwarte Ihre Stellungnahme und verbleibe mit freundlichen Grüßen,
     </div>
   );
 };
+const renderBlog = () => {
+  const isAdmin = user?.email === "waldraffnico@eclipso.de";
 
+  if (selectedPost) return (
+    <div>
+      <button style={S.chatBack} onClick={() => setSelectedPost(null)}>← Zurück</button>
+      {selectedPost.image_url && (
+        <img src={selectedPost.image_url} style={{ width: "100%", borderRadius: "12px", marginTop: "16px", marginBottom: "20px", maxHeight: "300px", objectFit: "cover" }} />
+      )}
+      <h2 style={{ fontSize: "24px", fontWeight: "900", margin: "16px 0 8px" }}>{selectedPost.title}</h2>
+      <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", marginBottom: "20px" }}>
+        {selectedPost.author} · {new Date(selectedPost.created_at).toLocaleDateString("de-DE")}
+      </div>
+      <div style={{ fontSize: "14px", lineHeight: "1.8", color: "rgba(255,255,255,0.8)", whiteSpace: "pre-wrap" }}>{selectedPost.content}</div>
+      {isAdmin && (
+        <button onClick={() => deleteBlogPost(selectedPost.id)}
+          style={{ marginTop: "24px", padding: "10px 20px", borderRadius: "8px", border: "1px solid rgba(224,92,92,0.3)", background: "rgba(224,92,92,0.1)", color: "#E05C5C", cursor: "pointer", fontSize: "13px", fontWeight: "700" }}>
+          🗑️ Beitrag löschen
+        </button>
+      )}
+    </div>
+  );
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+        <div>
+          <h2 style={{ fontSize: "22px", fontWeight: "800", marginBottom: "6px" }}>📰 Blog</h2>
+          <p style={{ fontSize: "13px", color: "rgba(255,255,255,0.45)" }}>Aktuelle Themen & Videoinhalte</p>
+        </div>
+        {isAdmin && (
+          <button onClick={() => setShowNewPost(!showNewPost)}
+            style={{ padding: "10px 16px", borderRadius: "8px", border: "none", background: "#C8963E", color: "#0D1B2A", fontWeight: "700", cursor: "pointer", fontSize: "13px" }}>
+            {showNewPost ? "Abbrechen" : "+ Neuer Beitrag"}
+          </button>
+        )}
+      </div>
+
+      {showNewPost && (
+        <div style={{ padding: "20px", background: "rgba(200,150,62,0.06)", border: "1px solid rgba(200,150,62,0.2)", borderRadius: "12px", marginBottom: "24px" }}>
+          <input style={{ ...S.input, width: "100%", marginBottom: "10px", boxSizing: "border-box" }}
+            placeholder="Titel" value={newTitle} onChange={e => setNewTitle(e.target.value)} />
+          <input style={{ ...S.input, width: "100%", marginBottom: "10px", boxSizing: "border-box" }}
+            placeholder="Bild-URL (optional)" value={newImageUrl} onChange={e => setNewImageUrl(e.target.value)} />
+          <textarea style={{ ...S.input, width: "100%", minHeight: "200px", resize: "vertical", boxSizing: "border-box" }}
+            placeholder="Inhalt des Beitrags..." value={newContent} onChange={e => setNewContent(e.target.value)} />
+          <button onClick={submitBlogPost} disabled={postingBlog}
+            style={{ marginTop: "10px", padding: "12px 24px", borderRadius: "8px", border: "none", background: "#C8963E", color: "#0D1B2A", fontWeight: "700", cursor: "pointer", fontSize: "13px", opacity: postingBlog ? 0.5 : 1 }}>
+            {postingBlog ? "Wird veröffentlicht..." : "Veröffentlichen"}
+          </button>
+        </div>
+      )}
+
+      {blogLoading && <div style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", padding: "40px" }}>Lädt...</div>}
+      {!blogLoading && blogPosts.length === 0 && (
+        <div style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", padding: "40px" }}>Noch keine Beiträge.</div>
+      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        {blogPosts.map(post => (
+          <div key={post.id} style={{ padding: "20px", borderRadius: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", cursor: "pointer", transition: "all 0.2s" }}
+            onClick={() => setSelectedPost(post)}
+            onMouseEnter={e => e.currentTarget.style.background = "rgba(200,150,62,0.06)"}
+            onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}>
+            {post.image_url && (
+              <img src={post.image_url} style={{ width: "100%", borderRadius: "8px", marginBottom: "12px", maxHeight: "200px", objectFit: "cover" }} />
+            )}
+            <div style={{ fontSize: "16px", fontWeight: "700", marginBottom: "6px" }}>{post.title}</div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", marginBottom: "10px" }}>
+              {post.author} · {new Date(post.created_at).toLocaleDateString("de-DE")}
+            </div>
+            <div style={{ fontSize: "13px", color: "rgba(255,255,255,0.5)", lineHeight: "1.6" }}>
+              {post.content.substring(0, 150)}…
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
   const tabs = [
     { id: "home", label: "🏠 Home" },
     { id: "rights", label: "📜 Rechte" },
